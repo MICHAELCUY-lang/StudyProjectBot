@@ -1,13 +1,9 @@
 // Spotify API service
 // This file handles authentication and API calls to Spotify
 
-// Note: In a production application, you should never store API keys in client-side code
-// Instead, implement a server that handles the authentication and proxies the API requests
-// This is for demonstration purposes only
-
 // Spotify API credentials
-const SPOTIFY_CLIENT_ID = "YOUR_CLIENT_ID"; // Replace with your actual client ID
-const SPOTIFY_CLIENT_SECRET = "YOUR_CLIENT_SECRET"; // Replace with your actual client secret
+const SPOTIFY_CLIENT_ID = "f8b64136c2b84dfe8a87792f371a0fef";
+const SPOTIFY_CLIENT_SECRET = "a22e0a461f9b4cc580352f7843310d88";
 
 // Storage keys
 const TOKEN_STORAGE_KEY = "spotify_access_token";
@@ -28,7 +24,6 @@ export const getAccessToken = async () => {
 
   // If no valid token, request a new one
   try {
-    // In a real app, you should make this request from your backend
     const response = await fetch("https://accounts.spotify.com/api/token", {
       method: "POST",
       headers: {
@@ -97,6 +92,7 @@ export const searchTracks = async (query, limit = 10) => {
       previewUrl: item.preview_url,
       externalUrl: item.external_urls.spotify,
       uri: item.uri,
+      service: "spotify",
     }));
   } catch (error) {
     console.error("Error searching Spotify tracks:", error);
@@ -184,6 +180,7 @@ export const getPlaylistTracks = async (playlistId, limit = 50) => {
       previewUrl: item.track.preview_url,
       externalUrl: item.track.external_urls.spotify,
       uri: item.track.uri,
+      service: "spotify",
     }));
   } catch (error) {
     console.error("Error getting playlist tracks:", error);
