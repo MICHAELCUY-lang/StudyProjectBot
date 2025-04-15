@@ -5,6 +5,7 @@ import {
   Route,
   Navigate,
   Link,
+  useNavigate,
 } from "react-router-dom";
 import styled from "styled-components";
 import { register } from "./serviceWorkerRegistration";
@@ -203,10 +204,8 @@ const InstallPrompt = styled.div`
   }
 `;
 
-// App Component
-export default App;
-
-function App() {
+// TaskManager component to handle task state
+function TaskManager() {
   const [tasks, setTasks] = useState([]);
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
@@ -214,6 +213,7 @@ function App() {
   const [isBreakTime, setIsBreakTime] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const navigate = useNavigate();
 
   // Inisialisasi database dan service worker
   useEffect(() => {
@@ -280,6 +280,9 @@ function App() {
       // Close modal
       setShowAddTaskModal(false);
       setEditingTask(null);
+
+      // Navigate to tasks view
+      navigate("/tasks");
     } catch (error) {
       console.error("Error submitting task:", error);
     }
@@ -338,156 +341,163 @@ function App() {
   }
 
   return (
-    <Router>
-      <AppContainer>
-        <Header>
-          <AppTitle>StudyProjectBot</AppTitle>
-        </Header>
+    <AppContainer>
+      <Header>
+        <AppTitle>StudyProjectBot</AppTitle>
+      </Header>
 
-        {deferredPrompt && (
-          <div style={{ padding: "0 1.5rem" }}>
-            <InstallPrompt>
-              <div>
-                Install StudyProjectBot untuk pengalaman yang lebih baik!
-              </div>
-              <button onClick={handleInstallClick}>Install</button>
-            </InstallPrompt>
-          </div>
-        )}
+      {deferredPrompt && (
+        <div style={{ padding: "0 1.5rem" }}>
+          <InstallPrompt>
+            <div>Install StudyProjectBot untuk pengalaman yang lebih baik!</div>
+            <button onClick={handleInstallClick}>Install</button>
+          </InstallPrompt>
+        </div>
+      )}
 
-        <Routes>
-          <Route path="/" element={<Navigate to="/tasks" />} />
+      <Routes>
+        <Route path="/" element={<Navigate to="/tasks" />} />
 
-          <Route
-            path="/tasks"
-            element={
-              <MainContent>
-                <ContentSection>
-                  <SectionTitle>Daftar Tugas</SectionTitle>
-                  <TaskList
-                    onEdit={handleTaskEdit}
-                    onDelete={handleTaskDelete}
-                  />
-                </ContentSection>
+        <Route
+          path="/tasks"
+          element={
+            <MainContent>
+              <ContentSection>
+                <SectionTitle>Daftar Tugas</SectionTitle>
+                <TaskList
+                  tasks={tasks}
+                  onEdit={handleTaskEdit}
+                  onDelete={handleTaskDelete}
+                />
+              </ContentSection>
 
-                <Sidebar>
-                  <MusicPlayer isBreak={isBreakTime} />
+              <Sidebar>
+                <MusicPlayer isBreak={isBreakTime} />
+                <PomodoroTimer
+                  tasks={tasks}
+                  onSessionComplete={handleSessionComplete}
+                />
+              </Sidebar>
+            </MainContent>
+          }
+        />
+
+        <Route
+          path="/pomodoro"
+          element={
+            <MainContent>
+              <ContentSection>
+                <SectionTitle>Pomodoro Timer</SectionTitle>
+                <div style={{ maxWidth: "600px", margin: "0 auto" }}>
                   <PomodoroTimer
                     tasks={tasks}
                     onSessionComplete={handleSessionComplete}
                   />
-                </Sidebar>
-              </MainContent>
-            }
-          />
+                </div>
+              </ContentSection>
 
-          <Route
-            path="/pomodoro"
-            element={
-              <MainContent>
-                <ContentSection>
-                  <SectionTitle>Pomodoro Timer</SectionTitle>
-                  <div style={{ maxWidth: "600px", margin: "0 auto" }}>
-                    <PomodoroTimer
-                      tasks={tasks}
-                      onSessionComplete={handleSessionComplete}
-                    />
-                  </div>
-                </ContentSection>
+              <Sidebar>
+                <MusicPlayer isBreak={isBreakTime} />
+              </Sidebar>
+            </MainContent>
+          }
+        />
 
-                <Sidebar>
+        <Route
+          path="/music"
+          element={
+            <MainContent>
+              <ContentSection>
+                <SectionTitle>Music Player</SectionTitle>
+                <div style={{ maxWidth: "600px", margin: "0 auto" }}>
                   <MusicPlayer isBreak={isBreakTime} />
-                </Sidebar>
-              </MainContent>
-            }
-          />
+                </div>
+              </ContentSection>
+            </MainContent>
+          }
+        />
 
-          <Route
-            path="/music"
-            element={
-              <MainContent>
-                <ContentSection>
-                  <SectionTitle>Music Player</SectionTitle>
-                  <div style={{ maxWidth: "600px", margin: "0 auto" }}>
-                    <MusicPlayer isBreak={isBreakTime} />
-                  </div>
-                </ContentSection>
-              </MainContent>
-            }
-          />
+        <Route
+          path="/stats"
+          element={
+            <MainContent>
+              <ContentSection>
+                <SectionTitle>Statistik & Progres</SectionTitle>
+                <p>Fitur statistik akan segera hadir!</p>
+              </ContentSection>
+            </MainContent>
+          }
+        />
+      </Routes>
 
-          <Route
-            path="/stats"
-            element={
-              <MainContent>
-                <ContentSection>
-                  <SectionTitle>Statistik & Progres</SectionTitle>
-                  <p>Fitur statistik akan segera hadir!</p>
-                </ContentSection>
-              </MainContent>
-            }
-          />
-        </Routes>
-
-        <Navigation>
-          <NavLink
-            to="/tasks"
-            active={activeTab === "tasks" ? 1 : 0}
-            onClick={() => setActiveTab("tasks")}
-          >
-            <i className="material-icons">assignment</i>
-            Tugas
-          </NavLink>
-          <NavLink
-            to="/pomodoro"
-            active={activeTab === "pomodoro" ? 1 : 0}
-            onClick={() => setActiveTab("pomodoro")}
-          >
-            <i className="material-icons">timer</i>
-            Pomodoro
-          </NavLink>
-          <NavLink
-            to="/music"
-            active={activeTab === "music" ? 1 : 0}
-            onClick={() => setActiveTab("music")}
-          >
-            <i className="material-icons">music_note</i>
-            Musik
-          </NavLink>
-          <NavLink
-            to="/stats"
-            active={activeTab === "stats" ? 1 : 0}
-            onClick={() => setActiveTab("stats")}
-          >
-            <i className="material-icons">bar_chart</i>
-            Statistik
-          </NavLink>
-        </Navigation>
-
-        <FloatingButton
-          onClick={() => {
-            setEditingTask(null);
-            setShowAddTaskModal(true);
-          }}
+      <Navigation>
+        <NavLink
+          to="/tasks"
+          active={activeTab === "tasks" ? 1 : 0}
+          onClick={() => setActiveTab("tasks")}
         >
-          <i className="material-icons">add</i>
-        </FloatingButton>
+          <i className="material-icons">assignment</i>
+          Tugas
+        </NavLink>
+        <NavLink
+          to="/pomodoro"
+          active={activeTab === "pomodoro" ? 1 : 0}
+          onClick={() => setActiveTab("pomodoro")}
+        >
+          <i className="material-icons">timer</i>
+          Pomodoro
+        </NavLink>
+        <NavLink
+          to="/music"
+          active={activeTab === "music" ? 1 : 0}
+          onClick={() => setActiveTab("music")}
+        >
+          <i className="material-icons">music_note</i>
+          Musik
+        </NavLink>
+        <NavLink
+          to="/stats"
+          active={activeTab === "stats" ? 1 : 0}
+          onClick={() => setActiveTab("stats")}
+        >
+          <i className="material-icons">bar_chart</i>
+          Statistik
+        </NavLink>
+      </Navigation>
 
-        {showAddTaskModal && (
-          <Modal onClick={() => setShowAddTaskModal(false)}>
-            <ModalContent onClick={(e) => e.stopPropagation()}>
-              <TaskForm
-                initialTask={editingTask}
-                onSubmit={handleTaskSubmit}
-                onCancel={() => {
-                  setShowAddTaskModal(false);
-                  setEditingTask(null);
-                }}
-              />
-            </ModalContent>
-          </Modal>
-        )}
-      </AppContainer>
+      <FloatingButton
+        onClick={() => {
+          setEditingTask(null);
+          setShowAddTaskModal(true);
+        }}
+      >
+        <i className="material-icons">add</i>
+      </FloatingButton>
+
+      {showAddTaskModal && (
+        <Modal onClick={() => setShowAddTaskModal(false)}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <TaskForm
+              initialTask={editingTask}
+              onSubmit={handleTaskSubmit}
+              onCancel={() => {
+                setShowAddTaskModal(false);
+                setEditingTask(null);
+              }}
+            />
+          </ModalContent>
+        </Modal>
+      )}
+    </AppContainer>
+  );
+}
+
+// App Component
+export default function App() {
+  return (
+    <Router>
+      <TaskManager />
     </Router>
   );
 }
+  

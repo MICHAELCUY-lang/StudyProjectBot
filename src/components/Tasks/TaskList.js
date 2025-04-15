@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { format } from "date-fns";
-import { TasksModel, CategoriesModel } from "../../services/db";
+import { CategoriesModel, TasksModel } from "../../services/db";
 
-// Styled components
+// Styled components - fixed with $ prefix for custom props
 const TaskListContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -23,7 +23,7 @@ const TaskCard = styled.div`
   }
 
   ${(props) =>
-    props.completed &&
+    props.$completed &&
     `
     opacity: 0.7;
   `}
@@ -44,7 +44,7 @@ const TaskTitle = styled.h3`
   word-break: break-word;
 
   ${(props) =>
-    props.completed &&
+    props.$completed &&
     `
     text-decoration: line-through;
     color: #777;
@@ -59,12 +59,12 @@ const TaskPriority = styled.span`
   text-transform: uppercase;
 
   ${(props) => {
-    if (props.priority === "high") {
+    if (props.$priority === "high") {
       return `
         background-color: #ffebee;
         color: #e53935;
       `;
-    } else if (props.priority === "medium") {
+    } else if (props.$priority === "medium") {
       return `
         background-color: #fff8e1;
         color: #ffa000;
@@ -85,7 +85,7 @@ const TaskDescription = styled.p`
   word-break: break-word;
 
   ${(props) =>
-    props.completed &&
+    props.$completed &&
     `
     color: #999;
   `}
@@ -105,7 +105,7 @@ const TaskMetadata = styled.div`
 `;
 
 const TaskDate = styled.div`
-  color: ${(props) => (props.isOverdue ? "#e53935" : "#666")};
+  color: ${(props) => (props.$isOverdue ? "#e53935" : "#666")};
   display: flex;
   align-items: center;
   gap: 0.25rem;
@@ -116,7 +116,7 @@ const TaskCategory = styled.div`
   align-items: center;
   gap: 0.25rem;
   padding: 0.2rem 0.5rem;
-  background-color: ${(props) => props.color || "#e0e0e0"};
+  background-color: ${(props) => props.$color || "#e0e0e0"};
   color: white;
   border-radius: 4px;
   font-weight: 500;
@@ -212,16 +212,16 @@ const TaskItem = ({ task, categories, onEdit, onDelete, onStatusChange }) => {
   };
 
   return (
-    <TaskCard completed={task.status === "completed"}>
+    <TaskCard $completed={task.status === "completed"}>
       <TaskHeader>
-        <TaskTitle completed={task.status === "completed"}>
+        <TaskTitle $completed={task.status === "completed"}>
           {task.title}
         </TaskTitle>
-        <TaskPriority priority={task.priority}>{task.priority}</TaskPriority>
+        <TaskPriority $priority={task.priority}>{task.priority}</TaskPriority>
       </TaskHeader>
 
       {task.description && (
-        <TaskDescription completed={task.status === "completed"}>
+        <TaskDescription $completed={task.status === "completed"}>
           {task.description}
         </TaskDescription>
       )}
@@ -229,7 +229,7 @@ const TaskItem = ({ task, categories, onEdit, onDelete, onStatusChange }) => {
       <TaskFooter>
         <TaskMetadata>
           {task.dueDate && (
-            <TaskDate isOverdue={isOverdue()}>
+            <TaskDate $isOverdue={isOverdue()}>
               <i className="material-icons" style={{ fontSize: "1rem" }}>
                 event
               </i>
@@ -238,7 +238,7 @@ const TaskItem = ({ task, categories, onEdit, onDelete, onStatusChange }) => {
           )}
 
           {category && (
-            <TaskCategory color={category.color}>
+            <TaskCategory $color={category.color}>
               <i className="material-icons" style={{ fontSize: "1rem" }}>
                 {category.icon || "folder"}
               </i>
@@ -255,169 +255,3 @@ const TaskItem = ({ task, categories, onEdit, onDelete, onStatusChange }) => {
                 ? "Mark as incomplete"
                 : "Mark as complete"
             }
-          >
-            <i className="material-icons">
-              {task.status === "completed"
-                ? "check_box"
-                : "check_box_outline_blank"}
-            </i>
-          </ActionButton>
-
-          <ActionButton onClick={() => onEdit(task)} title="Edit task">
-            <i className="material-icons">edit</i>
-          </ActionButton>
-
-          <ActionButton onClick={() => onDelete(task.id)} title="Delete task">
-            <i className="material-icons">delete</i>
-          </ActionButton>
-        </TaskActions>
-      </TaskFooter>
-    </TaskCard>
-  );
-};
-
-// Main Component
-const TaskList = ({ onEdit, onDelete }) => {
-  const [tasks, setTasks] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all"); // all, pending, completed
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [priorityFilter, setPriorityFilter] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
-
-  // Load tasks and categories
-  useEffect(() => {
-    Promise.all([TasksModel.getAllTasks(), CategoriesModel.getAllCategories()])
-      .then(([taskData, categoryData]) => {
-        setTasks(taskData);
-        setCategories(categoryData);
-        setLoading(false);
-      })
-      .catch((error) => {
-        console.error("Error loading data:", error);
-        setLoading(false);
-      });
-  }, []);
-
-  // Filter tasks based on criteria
-  const filteredTasks = tasks.filter((task) => {
-    // Status filter
-    if (filter === "pending" && task.status === "completed") return false;
-    if (filter === "completed" && task.status !== "completed") return false;
-
-    // Category filter
-    if (
-      categoryFilter !== "all" &&
-      task.categoryId !== parseInt(categoryFilter)
-    )
-      return false;
-
-    // Priority filter
-    if (priorityFilter !== "all" && task.priority !== priorityFilter)
-      return false;
-
-    // Search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return (
-        task.title.toLowerCase().includes(query) ||
-        (task.description && task.description.toLowerCase().includes(query))
-      );
-    }
-
-    return true;
-  });
-
-  // Handle status change
-  const handleStatusChange = (taskId, newStatus) => {
-    TasksModel.updateTaskStatus(taskId, newStatus)
-      .then(() => {
-        setTasks((prevTasks) =>
-          prevTasks.map((task) =>
-            task.id === taskId ? { ...task, status: newStatus } : task
-          )
-        );
-      })
-      .catch((error) => {
-        console.error("Error updating task status:", error);
-      });
-  };
-
-  if (loading) {
-    return <div>Loading...</div>;
-  }
-
-  return (
-    <div>
-      <FilterSection>
-        <FilterSelect
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        >
-          <option value="all">Semua Status</option>
-          <option value="pending">Belum Selesai</option>
-          <option value="completed">Selesai</option>
-        </FilterSelect>
-
-        <FilterSelect
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-        >
-          <option value="all">Semua Kategori</option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
-        </FilterSelect>
-
-        <FilterSelect
-          value={priorityFilter}
-          onChange={(e) => setPriorityFilter(e.target.value)}
-        >
-          <option value="all">Semua Prioritas</option>
-          <option value="high">Tinggi</option>
-          <option value="medium">Sedang</option>
-          <option value="low">Rendah</option>
-        </FilterSelect>
-
-        <SearchInput
-          type="text"
-          placeholder="Cari tugas..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-      </FilterSection>
-
-      <TaskListContainer>
-        {filteredTasks.length === 0 ? (
-          <EmptyState>
-            <p>Tidak ada tugas yang ditemukan</p>
-            {filter !== "all" ||
-            categoryFilter !== "all" ||
-            priorityFilter !== "all" ||
-            searchQuery ? (
-              <p>Coba ubah filter pencarian Anda</p>
-            ) : (
-              <p>Tambahkan tugas baru untuk mulai menggunakan aplikasi</p>
-            )}
-          </EmptyState>
-        ) : (
-          filteredTasks.map((task) => (
-            <TaskItem
-              key={task.id}
-              task={task}
-              categories={categories}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onStatusChange={handleStatusChange}
-            />
-          ))
-        )}
-      </TaskListContainer>
-    </div>
-  );
-};
-
-export default TaskList;

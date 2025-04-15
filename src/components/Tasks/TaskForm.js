@@ -131,7 +131,10 @@ const SecondaryButton = styled(Button)`
 `;
 
 // Main Component
-const TaskForm = ({ initialTask = {}, onSubmit, onCancel }) => {
+const TaskForm = ({ initialTask, onSubmit, onCancel }) => {
+  // Ensure initialTask is an object, even if null or undefined
+  const task = initialTask || {};
+
   const [categories, setCategories] = useState([]);
   const {
     register,
@@ -140,13 +143,13 @@ const TaskForm = ({ initialTask = {}, onSubmit, onCancel }) => {
     reset,
   } = useForm({
     defaultValues: {
-      title: initialTask.title || "",
-      description: initialTask.description || "",
-      dueDate: initialTask.dueDate
-        ? new Date(initialTask.dueDate).toISOString().slice(0, 10)
+      title: task.title || "",
+      description: task.description || "",
+      dueDate: task.dueDate
+        ? new Date(task.dueDate).toISOString().slice(0, 10)
         : "",
-      priority: initialTask.priority || "medium",
-      categoryId: initialTask.categoryId || "",
+      priority: task.priority || "medium",
+      categoryId: task.categoryId || "",
     },
   });
 
@@ -156,11 +159,11 @@ const TaskForm = ({ initialTask = {}, onSubmit, onCancel }) => {
       setCategories(data);
 
       // Jika tidak ada kategori yang dipilih, pilih yang pertama
-      if (!initialTask.categoryId && data.length > 0) {
+      if (!task.categoryId && data.length > 0) {
         reset((values) => ({ ...values, categoryId: String(data[0].id) }));
       }
     });
-  }, [initialTask.categoryId, reset]);
+  }, [task.categoryId, reset]);
 
   // Handle submit
   const submitHandler = async (data) => {
@@ -182,9 +185,7 @@ const TaskForm = ({ initialTask = {}, onSubmit, onCancel }) => {
 
   return (
     <FormContainer>
-      <FormTitle>
-        {initialTask.id ? "Edit Tugas" : "Tambah Tugas Baru"}
-      </FormTitle>
+      <FormTitle>{task.id ? "Edit Tugas" : "Tambah Tugas Baru"}</FormTitle>
 
       <form onSubmit={handleSubmit(submitHandler)}>
         <FormGroup>
@@ -243,11 +244,7 @@ const TaskForm = ({ initialTask = {}, onSubmit, onCancel }) => {
             Batal
           </SecondaryButton>
           <PrimaryButton type="submit" disabled={isSubmitting}>
-            {isSubmitting
-              ? "Menyimpan..."
-              : initialTask.id
-              ? "Perbarui"
-              : "Simpan"}
+            {isSubmitting ? "Menyimpan..." : task.id ? "Perbarui" : "Simpan"}
           </PrimaryButton>
         </ButtonGroup>
       </form>
