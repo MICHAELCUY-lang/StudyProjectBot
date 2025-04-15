@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import styled from "styled-components";
 import { PreferencesModel } from "../../services/db";
+import { searchTracks, searchPlaylists } from "../../services/spotify";
+import { searchVideos } from "../../services/youtube";
 
 // Fixed styled components with transient props (using $prefix)
 const MusicPlayerContainer = styled.div`
@@ -315,6 +317,23 @@ const IframeContainer = styled.div`
   height: 100%;
 `;
 
+const LoadingIndicator = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  color: rgba(255, 255, 255, 0.7);
+`;
+
+const ErrorMessage = styled.div`
+  color: #f8d7da;
+  background-color: rgba(220, 53, 69, 0.2);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+`;
+
 // Main component
 const MusicPlayer = ({ isBreak }) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -327,6 +346,7 @@ const MusicPlayer = ({ isBreak }) => {
   const [service, setService] = useState("youtube"); // youtube or spotify
   const [showPlayer, setShowPlayer] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [error, setError] = useState(null);
 
   // References
   const audioRef = useRef(null);
@@ -348,6 +368,7 @@ const MusicPlayer = ({ isBreak }) => {
     setCurrentTrack(null);
     setIsPlaying(false);
     setShowPlayer(false);
+    setError(null);
   }, [service]);
 
   // Function to search YouTube
@@ -355,14 +376,16 @@ const MusicPlayer = ({ isBreak }) => {
     if (!query) return;
 
     setIsSearching(true);
+    setError(null);
 
     try {
-      // For security reasons, we're using mock data instead of actual API calls
-      // In a real app, you'd make these requests through your backend
-      setSearchResults(getMockYouTubeResults(query));
+      // Use real YouTube API service
+      const results = await searchVideos(query);
+      setSearchResults(results);
     } catch (error) {
       console.error("Error searching YouTube:", error);
-      // Show mock data if there's an error
+      setError("Terjadi kesalahan saat mencari di YouTube. Silakan coba lagi.");
+      // Fallback to mock data
       setSearchResults(getMockYouTubeResults(query));
     } finally {
       setIsSearching(false);
@@ -374,14 +397,27 @@ const MusicPlayer = ({ isBreak }) => {
     if (!query) return;
 
     setIsSearching(true);
+    setError(null);
 
     try {
-      // For security reasons, we're using mock data instead of actual API calls
-      // In a real app, you'd make these requests through your backend
-      setSearchResults(getMockSpotifyResults(query));
+      // Use real Spotify API service
+      const results = await searchTracks(query);
+
+      // Format the results
+      const formattedResults = results.map((track) => ({
+        id: track.id,
+        title: track.title,
+        artist: track.artist,
+        thumbnail:
+          track.albumImage || "https://place-hold.it/300x300?text=No%20Image",
+        service: "spotify",
+      }));
+
+      setSearchResults(formattedResults);
     } catch (error) {
       console.error("Error searching Spotify:", error);
-      // Show mock data if there's an error
+      setError("Terjadi kesalahan saat mencari di Spotify. Silakan coba lagi.");
+      // Fallback to mock data
       setSearchResults(getMockSpotifyResults(query));
     } finally {
       setIsSearching(false);
@@ -441,7 +477,7 @@ const MusicPlayer = ({ isBreak }) => {
     });
   };
 
-  // Mock data for YouTube results
+  // Mock data for YouTube results (fallback)
   const getMockYouTubeResults = (query) => {
     const isRelaxQuery =
       isBreak ||
@@ -500,7 +536,7 @@ const MusicPlayer = ({ isBreak }) => {
     }
   };
 
-  // Mock data for Spotify results
+  // Mock data for Spotify results (fallback)
   const getMockSpotifyResults = (query) => {
     const isRelaxQuery =
       isBreak ||
@@ -605,18 +641,29 @@ const MusicPlayer = ({ isBreak }) => {
         </SearchButton>
       </SearchContainer>
 
-      {searchResults.length > 0 && (
-        <ResultsList>
-          {searchResults.map((result) => (
-            <ResultItem key={result.id} onClick={() => playTrack(result)}>
-              <ResultThumbnail src={result.thumbnail} alt={result.title} />
-              <ResultInfo>
-                <ResultTitle>{result.title}</ResultTitle>
-                <ResultArtist>{result.artist}</ResultArtist>
-              </ResultInfo>
-            </ResultItem>
-          ))}
-        </ResultsList>
+      {error && <ErrorMessage>{error}</ErrorMessage>}
+
+      {isSearching ? (
+        <LoadingIndicator>
+          <i className="material-icons" style={{ marginRight: "0.5rem" }}>
+            hourglass_empty
+          </i>
+          Mencari...
+        </LoadingIndicator>
+      ) : (
+        searchResults.length > 0 && (
+          <ResultsList>
+            {searchResults.map((result) => (
+              <ResultItem key={result.id} onClick={() => playTrack(result)}>
+                <ResultThumbnail src={result.thumbnail} alt={result.title} />
+                <ResultInfo>
+                  <ResultTitle>{result.title}</ResultTitle>
+                  <ResultArtist>{result.artist}</ResultArtist>
+                </ResultInfo>
+              </ResultItem>
+            ))}
+          </ResultsList>
+        )
       )}
 
       {currentTrack && (
