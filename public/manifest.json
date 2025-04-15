@@ -1,176 +1,74 @@
-/* eslint-disable no-restricted-globals */
-
-// Nama dan versi cache
-const CACHE_NAME = 'studyprojectbot-v1';
-
-// Daftar aset untuk di-cache
-const urlsToCache = [
-  '/',
-  '/index.html',
-  '/static/js/main.chunk.js',
-  '/static/js/bundle.js',
-  '/static/css/main.chunk.css',
-  '/manifest.json',
-  '/logo192.png',
-  '/logo512.png',
-  '/offline.html'
-];
-
-// Install service worker
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Cache dibuka');
-        return cache.addAll(urlsToCache);
-      })
-      .then(() => self.skipWaiting())
-  );
-});
-
-// Activate dan cleanup cache lama
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Menghapus cache lama:', cacheName);
-            return caches.delete(cacheName);
-          }
-          return null;
-        })
-      );
-    }).then(() => self.clients.claim())
-  );
-});
-
-// Fetch untuk offline caching
-self.addEventListener('fetch', event => {
-  // Lewati request yang bukan GET
-  if (event.request.method !== 'GET') return;
-  
-  // Lewati URL cross-origin
-  if (!event.request.url.startsWith(self.location.origin)) return;
-  
-  // Strategi cache-first untuk aset statis
-  if (event.request.url.includes('/static/')) {
-    event.respondWith(
-      caches.match(event.request).then(cachedResponse => {
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-        
-        return fetch(event.request).then(response => {
-          // Cache respons baru
-          if (response.status === 200) {
-            const responseToCache = response.clone();
-            caches.open(CACHE_NAME).then(cache => {
-              cache.put(event.request, responseToCache);
-            });
-          }
-          return response;
-        });
-      }).catch(() => {
-        // Jika offline tampilkan offline.html untuk request halaman
-        if (event.request.headers.get('accept').includes('text/html')) {
-          return caches.match('/offline.html');
-        }
-        return null;
-      })
-    );
-    return;
-  }
-  
-  // Strategi network-first untuk konten dinamis
-  event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        // Cache salinan respons
-        if (response.status === 200) {
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return response;
-      })
-      .catch(() => {
-        // Jika network gagal, coba dari cache
-        return caches.match(event.request).then(cachedResponse => {
-          if (cachedResponse) {
-            return cachedResponse;
-          }
-          // Jika request HTML, tampilkan halaman offline
-          if (event.request.headers.get('accept').includes('text/html')) {
-            return caches.match('/offline.html');
-          }
-          return null;
-        });
-      })
-  );
-});
-
-// Handle push notifications
-self.addEventListener('push', event => {
-  let payload = {};
-  try {
-    payload = event.data.json();
-  } catch (e) {
-    payload = {
-      title: 'StudyProjectBot',
-      body: event.data ? event.data.text() : 'Pengingat dari StudyProjectBot',
-      icon: '/logo192.png',
-      url: '/'
-    };
-  }
-  
-  const options = {
-    body: payload.body,
-    icon: payload.icon || '/logo192.png',
-    badge: '/badge.png',
-    vibrate: [100, 50, 100],
-    data: {
-      url: payload.url || '/'
+{
+  "short_name": "StudyProjectBot",
+  "name": "StudyProjectBot - Asisten Belajar",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
     },
-    actions: [
-      {
-        action: 'open',
-        title: 'Lihat'
-      },
-      {
-        action: 'close',
-        title: 'Tutup'
-      }
-    ]
-  };
-  
-  event.waitUntil(
-    self.registration.showNotification(payload.title, options)
-  );
-});
-
-// Handle notifikasi yang diklik
-self.addEventListener('notificationclick', event => {
-  event.notification.close();
-  
-  if (event.action === 'close') {
-    return;
-  }
-  
-  event.waitUntil(
-    clients.matchAll({ type: 'window' })
-      .then(clientList => {
-        // Jika ada window terbuka, fokuskan
-        for (const client of clientList) {
-          if (client.url === event.notification.data.url && 'focus' in client) {
-            return client.focus();
-          }
-        }
-        // Jika tidak, buka window baru
-        if (clients.openWindow) {
-          return clients.openWindow(event.notification.data.url);
-        }
-      })
-  );
-});
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#4A00E0",
+  "background_color": "#ffffff",
+  "orientation": "portrait",
+  "scope": "/",
+  "description": "Aplikasi manajemen tugas, Pomodoro timer, dan pemutar musik untuk meningkatkan produktivitas belajar",
+  "categories": ["education", "productivity", "lifestyle"],
+  "lang": "id",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Tambah Tugas",
+      "short_name": "Tugas",
+      "description": "Tambahkan tugas baru",
+      "url": "/?action=new-task",
+      "icons": [{ "src": "logo192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Timer Pomodoro",
+      "short_name": "Pomodoro",
+      "description": "Mulai sesi fokus Pomodoro",
+      "url": "/pomodoro",
+      "icons": [{ "src": "logo192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Putar Musik",
+      "short_name": "Musik",
+      "description": "Putar musik konsentrasi",
+      "url": "/music",
+      "icons": [{ "src": "logo192.png", "sizes": "192x192" }]
+    }
+  ],
+  "related_applications": [],
+  "screenshots": [
+    {
+      "src": "screenshot1.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "platform": "wide",
+      "label": "Tampilan Beranda StudyProjectBot"
+    },
+    {
+      "src": "screenshot2.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "platform": "wide",
+      "label": "Timer Pomodoro StudyProjectBot"
+    }
+  ]
+}
