@@ -12,7 +12,7 @@ const TimerContainer = styled.div`
   flex-direction: column;
   align-items: center;
   padding: 2rem;
-  background-color: ${(props) => (props.isBreak ? "#4CAF50" : "#F44336")};
+  background-color: ${(props) => (props.isBreak ? "#4CAF50" : "#25AA60")};
   color: white;
   border-radius: 1rem;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);

@@ -18,7 +18,7 @@ import TaskList from "./components/Tasks/TaskList";
 import TaskForm from "./components/Tasks/TaskForm";
 import MusicPlayer from "./components/MusicPlayer/MusicPlayer";
 
-// Styled components
+// Styled components with green theme
 const AppContainer = styled.div`
   min-height: 100vh;
   background-color: #f5f5f5;
@@ -27,13 +27,13 @@ const AppContainer = styled.div`
 `;
 
 const Header = styled.header`
-  background-color: #4a00e0;
+  background-color: #25aa60; /* Changed from #4A00E0 to match the logo */
   color: white;
   padding: 1rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 10px rgba(37, 170, 96, 0.25); /* Green shadow */
 `;
 
 const AppTitle = styled.h1`
@@ -94,14 +94,15 @@ const NavLink = styled(Link)`
   flex-direction: column;
   align-items: center;
   text-decoration: none;
-  color: ${(props) => (props.active ? "#4A00E0" : "#777")};
+  color: ${(props) =>
+    props.active ? "#25AA60" : "#777"}; /* Changed from #4A00E0 */
   font-size: 0.8rem;
   padding: 0.5rem;
   border-radius: 8px;
   transition: background-color 0.2s;
 
   &:hover {
-    background-color: rgba(74, 0, 224, 0.05);
+    background-color: rgba(37, 170, 96, 0.05); /* Changed rgba value */
   }
 
   i {
@@ -125,13 +126,13 @@ const FloatingButton = styled.button`
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background-color: #4a00e0;
+  background-color: #25aa60; /* Changed from #4A00E0 */
   color: white;
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(74, 0, 224, 0.25);
+  box-shadow: 0 4px 12px rgba(37, 170, 96, 0.25); /* Changed shadow color */
   cursor: pointer;
   transition: transform 0.2s, background-color 0.2s;
   z-index: 10;
@@ -142,7 +143,7 @@ const FloatingButton = styled.button`
 
   &:hover {
     transform: translateY(-3px);
-    background-color: #3700b3;
+    background-color: #1d8549; /* Changed from #3700b3 - darker green */
   }
 
   &:active {
@@ -179,7 +180,7 @@ const ModalContent = styled.div`
 `;
 
 const InstallPrompt = styled.div`
-  background-color: #4a00e0;
+  background-color: #25aa60; /* Changed from #4A00E0 */
   color: white;
   padding: 1rem;
   border-radius: 10px;
@@ -190,7 +191,7 @@ const InstallPrompt = styled.div`
 
   button {
     background-color: white;
-    color: #4a00e0;
+    color: #25aa60; /* Changed from #4A00E0 */
     border: none;
     padding: 0.5rem 1rem;
     border-radius: 5px;
@@ -500,4 +501,3 @@ export default function App() {
     </Router>
   );
 }
-  

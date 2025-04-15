@@ -8,7 +8,7 @@ import { searchVideos } from "../../services/youtube";
 const MusicPlayerContainer = styled.div`
   display: flex;
   flex-direction: column;
-  background-color: ${(props) => (props.$isBreak ? "#4CAF50" : "#4A00E0")};
+  background-color: ${(props) => (props.$isBreak ? "#4CAF50" : "#25AA60")};
   color: white;
   border-radius: 1rem;
   padding: 1.5rem;
