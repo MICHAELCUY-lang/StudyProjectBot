@@ -252,6 +252,216 @@ const TaskItem = ({ task, categories, onEdit, onDelete, onStatusChange }) => {
             onClick={handleStatusToggle}
             title={
               task.status === "completed"
-                ? "Mark as incomplete"
-                : "Mark as complete"
+                ? "Tandai belum selesai"
+                : "Tandai selesai"
             }
+          >
+            <i className="material-icons">
+              {task.status === "completed" ? "refresh" : "check_circle"}
+            </i>
+          </ActionButton>
+          <ActionButton onClick={() => onEdit(task)} title="Edit tugas">
+            <i className="material-icons">edit</i>
+          </ActionButton>
+          <ActionButton onClick={() => onDelete(task.id)} title="Hapus tugas">
+            <i className="material-icons">delete</i>
+          </ActionButton>
+        </TaskActions>
+      </TaskFooter>
+    </TaskCard>
+  );
+};
+
+// Main TaskList Component
+const TaskList = ({ tasks = [], onEdit, onDelete }) => {
+  const [filteredTasks, setFilteredTasks] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [filter, setFilter] = useState({
+    status: "all",
+    priority: "all",
+    category: "all",
+    search: "",
+  });
+
+  // Load categories
+  useEffect(() => {
+    CategoriesModel.getAllCategories().then((data) => {
+      setCategories(data);
+    });
+  }, []);
+
+  // Apply filters
+  useEffect(() => {
+    let result = [...tasks];
+
+    // Filter by status
+    if (filter.status !== "all") {
+      result = result.filter((task) => task.status === filter.status);
+    }
+
+    // Filter by priority
+    if (filter.priority !== "all") {
+      result = result.filter((task) => task.priority === filter.priority);
+    }
+
+    // Filter by category
+    if (filter.category !== "all") {
+      result = result.filter(
+        (task) => task.categoryId === parseInt(filter.category)
+      );
+    }
+
+    // Filter by search query
+    if (filter.search) {
+      const searchLower = filter.search.toLowerCase();
+      result = result.filter(
+        (task) =>
+          task.title.toLowerCase().includes(searchLower) ||
+          (task.description &&
+            task.description.toLowerCase().includes(searchLower))
+      );
+    }
+
+    // Sort tasks: pending first, then by priority, then by due date
+    result.sort((a, b) => {
+      // First by status (pending first)
+      if (a.status === "completed" && b.status !== "completed") return 1;
+      if (a.status !== "completed" && b.status === "completed") return -1;
+
+      // Then by priority
+      const priorityOrder = { high: 0, medium: 1, low: 2 };
+      if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
+        return priorityOrder[a.priority] - priorityOrder[b.priority];
+      }
+
+      // Then by due date (if both have due dates)
+      if (a.dueDate && b.dueDate) {
+        return new Date(a.dueDate) - new Date(b.dueDate);
+      }
+
+      // Tasks with due dates come before tasks without due dates
+      if (a.dueDate && !b.dueDate) return -1;
+      if (!a.dueDate && b.dueDate) return 1;
+
+      // Finally by title
+      return a.title.localeCompare(b.title);
+    });
+
+    setFilteredTasks(result);
+  }, [tasks, filter]);
+
+  // Handle filter change
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilter((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // Handle task status change
+  const handleStatusChange = async (taskId, newStatus) => {
+    try {
+      await TasksModel.updateTaskStatus(taskId, newStatus);
+
+      // Update statistics if task is completed
+      if (newStatus === "completed") {
+        await StatisticsModel.incrementCompletedTasks();
+      }
+
+      // Find and update the task in the tasks list
+      const updatedTasks = tasks.map((task) =>
+        task.id === taskId ? { ...task, status: newStatus } : task
+      );
+
+      // Update UI with new task data
+      setFilteredTasks(
+        filteredTasks.map((task) =>
+          task.id === taskId ? { ...task, status: newStatus } : task
+        )
+      );
+    } catch (error) {
+      console.error("Error updating task status:", error);
+    }
+  };
+
+  return (
+    <div>
+      <FilterSection>
+        <FilterSelect
+          name="status"
+          value={filter.status}
+          onChange={handleFilterChange}
+        >
+          <option value="all">Semua Status</option>
+          <option value="pending">Belum Selesai</option>
+          <option value="completed">Selesai</option>
+        </FilterSelect>
+
+        <FilterSelect
+          name="priority"
+          value={filter.priority}
+          onChange={handleFilterChange}
+        >
+          <option value="all">Semua Prioritas</option>
+          <option value="high">Tinggi</option>
+          <option value="medium">Sedang</option>
+          <option value="low">Rendah</option>
+        </FilterSelect>
+
+        <FilterSelect
+          name="category"
+          value={filter.category}
+          onChange={handleFilterChange}
+        >
+          <option value="all">Semua Kategori</option>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </FilterSelect>
+
+        <SearchInput
+          type="text"
+          name="search"
+          value={filter.search}
+          onChange={handleFilterChange}
+          placeholder="Cari tugas..."
+        />
+      </FilterSection>
+
+      <TaskListContainer>
+        {filteredTasks.length > 0 ? (
+          filteredTasks.map((task) => (
+            <TaskItem
+              key={task.id}
+              task={task}
+              categories={categories}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onStatusChange={handleStatusChange}
+            />
+          ))
+        ) : (
+          <EmptyState>
+            <i
+              className="material-icons"
+              style={{ fontSize: "3rem", opacity: 0.3, marginBottom: "1rem" }}
+            >
+              assignment
+            </i>
+            <h3>Tidak ada tugas</h3>
+            <p>
+              {filter.status !== "all" ||
+              filter.priority !== "all" ||
+              filter.category !== "all" ||
+              filter.search
+                ? "Coba ubah filter untuk melihat lebih banyak tugas"
+                : "Klik tombol + untuk menambahkan tugas baru"}
+            </p>
+          </EmptyState>
+        )}
+      </TaskListContainer>
+    </div>
+  );
+};
+
+export default TaskList;
