@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import styled from "styled-components";
 import { PreferencesModel } from "../../services/db";
+import * as YouTubeService from "../../services/youtube";
+import * as SpotifyService from "../../services/spotify";
 
 // Styled components with new design
 const MusicPlayerContainer = styled.div`
@@ -273,6 +275,36 @@ const ServiceTab = styled.button`
   `}
 `;
 
+const ContentTypeToggle = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2rem;
+  padding: 0.3rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+`;
+
+const ContentTypeButton = styled.button`
+  padding: 0.5rem 1rem;
+  background-color: ${(props) =>
+    props.$active ? "rgba(255, 255, 255, 0.2)" : "transparent"};
+  color: white;
+  border: none;
+  border-radius: 1.5rem;
+  font-size: 0.85rem;
+  font-weight: ${(props) => (props.$active ? "600" : "400")};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: 1;
+
+  &:hover {
+    background-color: ${(props) =>
+      props.$active ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.1)"};
+  }
+`;
+
 const ResultsList = styled.div`
   margin-top: 1.5rem;
   max-height: 300px;
@@ -349,6 +381,17 @@ const ResultArtist = styled.div`
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+`;
+
+const SearchTypeTag = styled.span`
+  font-size: 0.65rem;
+  padding: 0.15rem 0.4rem;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 0.3rem;
+  margin-right: 0.4rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 `;
 
 const VolumeControl = styled.div`
@@ -601,6 +644,115 @@ const Bar = styled.span`
   }
 `;
 
+const SearchLoadingSpinner = styled.div`
+  display: ${(props) => (props.$isLoading ? "block" : "none")};
+  margin: 1rem auto;
+  width: 30px;
+  height: 30px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 1s ease-in-out infinite;
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+`;
+
+const ErrorMessage = styled.div`
+  margin: 1rem 0;
+  padding: 0.8rem;
+  background-color: rgba(255, 87, 87, 0.2);
+  border: 1px solid rgba(255, 87, 87, 0.3);
+  border-radius: 0.5rem;
+  color: white;
+  font-size: 0.9rem;
+  display: ${(props) => (props.$visible ? "block" : "none")};
+`;
+
+const RecentlyPlayedSection = styled.div`
+  margin-top: 1.5rem;
+  z-index: 1;
+`;
+
+const SectionTitle = styled.h4`
+  margin: 0 0 0.8rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  i {
+    font-size: 1.2rem;
+    opacity: 0.8;
+  }
+`;
+
+const TopPicksContainer = styled.div`
+  margin-top: 1.5rem;
+  z-index: 1;
+  display: ${(props) => (props.$visible ? "block" : "none")};
+`;
+
+const TopPicksGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1rem;
+`;
+
+const TopPickItem = styled.div`
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 0.8rem;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+`;
+
+const TopPickImg = styled.img`
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+`;
+
+const TopPickInfo = styled.div`
+  padding: 0.8rem;
+`;
+
+const TopPickTitle = styled.h5`
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const NoResults = styled.div`
+  padding: 2rem 1rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
+  margin-top: 1rem;
+
+  i {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    display: block;
+    opacity: 0.5;
+  }
+`;
+
 // Main component
 const MusicPlayer = ({ isBreak }) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -611,9 +763,14 @@ const MusicPlayer = ({ isBreak }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [service, setService] = useState("youtube"); // youtube or spotify
+  const [contentType, setContentType] = useState("tracks"); // tracks or playlists
   const [showPlayer, setShowPlayer] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [showVolumeBadge, setShowVolumeBadge] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [recentlyPlayed, setRecentlyPlayed] = useState([]);
+  const [topPicks, setTopPicks] = useState([]);
+  const [isLoadingTopPicks, setIsLoadingTopPicks] = useState(false);
   const volumeBadgeTimeoutRef = useRef(null);
 
   // References
@@ -622,20 +779,68 @@ const MusicPlayer = ({ isBreak }) => {
   const progressTimerRef = useRef(null);
   const spotifyTokenRef = useRef(null);
 
-  // Load preferences on mount
+  // Load preferences and init on mount
   useEffect(() => {
-    PreferencesModel.getMusicPreferences().then((prefs) => {
-      setVolume(prefs.volume);
-    });
+    const initPlayer = async () => {
+      try {
+        // Load volume preferences
+        const prefs = await PreferencesModel.getMusicPreferences();
+        setVolume(prefs.volume);
+
+        // Load recently played
+        const recent = YouTubeService.getRecentlyPlayed();
+        setRecentlyPlayed(recent.slice(0, 5));
+
+        // Load recommended content based on mode
+        loadTopPicks();
+      } catch (error) {
+        console.error("Error initializing music player:", error);
+      }
+    };
+
+    initPlayer();
   }, []);
+
+  // Handle mode change (focus/break)
+  useEffect(() => {
+    loadTopPicks();
+  }, [isBreak]);
+
+  // Load top picks based on current mode
+  const loadTopPicks = async () => {
+    setIsLoadingTopPicks(true);
+    try {
+      if (service === "youtube") {
+        const recommendations = await YouTubeService.getRecommendedVideos(
+          isBreak
+        );
+        setTopPicks(recommendations);
+      } else {
+        const recommendations = await SpotifyService.getRecommendedPlaylists(
+          isBreak
+        );
+        setTopPicks(recommendations);
+      }
+    } catch (error) {
+      console.error("Error loading recommendations:", error);
+      // Fall back to mock data if API fails
+      setTopPicks(getMockRecommendations());
+    } finally {
+      setIsLoadingTopPicks(false);
+    }
+  };
 
   // Handle service change
   useEffect(() => {
     // Reset when changing service
     setSearchResults([]);
+    setContentType("tracks");
+    setSearchQuery("");
+    setErrorMessage("");
     setCurrentTrack(null);
     setIsPlaying(false);
     setShowPlayer(false);
+    loadTopPicks();
   }, [service]);
 
   // Effect to simulate progress updates
@@ -650,9 +855,19 @@ const MusicPlayer = ({ isBreak }) => {
       progressTimerRef.current = setInterval(() => {
         setCurrentTime((prevTime) => {
           const newTime = prevTime + 1;
-          // Assuming a track length of 4:32 (272 seconds)
-          const percentage = (newTime / 272) * 100;
-          setProgress(percentage > 100 ? 100 : percentage);
+          // Calculate duration based on track or default to 4:32 (272 seconds)
+          const totalDuration = currentTrack.duration || 272;
+          const percentage = (newTime / totalDuration) * 100;
+
+          // If reached the end, reset
+          if (percentage >= 100) {
+            setIsPlaying(false);
+            setProgress(100);
+            clearInterval(progressTimerRef.current);
+            return totalDuration;
+          }
+
+          setProgress(percentage);
           return newTime;
         });
       }, 1000);
@@ -668,21 +883,43 @@ const MusicPlayer = ({ isBreak }) => {
       }
     };
   }, [isPlaying, currentTrack]);
-
   // Function to search YouTube
   const searchYouTube = async (query) => {
     if (!query) return;
 
     setIsSearching(true);
+    setErrorMessage("");
 
     try {
-      // For security reasons, we're using mock data instead of actual API calls
-      // In a real app, you'd make these requests through your backend
-      setSearchResults(getMockYouTubeResults(query));
+      let results;
+      if (contentType === "tracks") {
+        results = await YouTubeService.searchVideos(query);
+      } else {
+        // For playlists, use a modified query to find playlists
+        results = await YouTubeService.searchVideos(`${query} playlist`);
+        // Filter results to try to get actual playlists
+        results = results.filter(
+          (item) =>
+            item.title.toLowerCase().includes("playlist") ||
+            item.title.toLowerCase().includes("mix") ||
+            item.description.toLowerCase().includes("playlist") ||
+            item.description.toLowerCase().includes("songs")
+        );
+      }
+
+      if (results.length === 0) {
+        setErrorMessage(`No ${contentType} found for "${query}"`);
+      }
+
+      setSearchResults(results);
     } catch (error) {
       console.error("Error searching YouTube:", error);
-      // Show mock data if there's an error
-      setSearchResults(getMockYouTubeResults(query));
+      setErrorMessage("Failed to search YouTube. Please try again.");
+
+      // Fallback to mock data in case of API error
+      setSearchResults(
+        getMockYoutubeResults(query, contentType === "playlists")
+      );
     } finally {
       setIsSearching(false);
     }
@@ -693,38 +930,338 @@ const MusicPlayer = ({ isBreak }) => {
     if (!query) return;
 
     setIsSearching(true);
+    setErrorMessage("");
 
     try {
-      // For security reasons, we're using mock data instead of actual API calls
-      // In a real app, you'd make these requests through your backend
-      setSearchResults(getMockSpotifyResults(query));
+      let results;
+      if (contentType === "tracks") {
+        results = await SpotifyService.searchTracks(query);
+      } else {
+        results = await SpotifyService.searchPlaylists(query);
+      }
+
+      if (results.length === 0) {
+        setErrorMessage(`No ${contentType} found for "${query}"`);
+      }
+
+      setSearchResults(results);
     } catch (error) {
       console.error("Error searching Spotify:", error);
-      // Show mock data if there's an error
-      setSearchResults(getMockSpotifyResults(query));
+      setErrorMessage("Failed to search Spotify. Please try again.");
+
+      // Fallback to mock data in case of API error
+      setSearchResults(
+        getMockSpotifyResults(query, contentType === "playlists")
+      );
     } finally {
       setIsSearching(false);
     }
   };
 
-  // Handle search
-  const handleSearch = () => {
-    if (service === "youtube") {
-      searchYouTube(searchQuery);
+  // Mock data for YouTube results
+  const getMockYoutubeResults = (query, isPlaylist = false) => {
+    const isRelaxQuery =
+      isBreak ||
+      query.toLowerCase().includes("relax") ||
+      query.toLowerCase().includes("ambient") ||
+      query.toLowerCase().includes("calm");
+
+    if (isPlaylist) {
+      // Playlist results
+      if (isRelaxQuery) {
+        return [
+          {
+            id: "PLQkQfzsIUwRbPZ0EltFFM2HW_67TFxLGW",
+            title: "Relaxing Music Playlist - Ambient Calm Music",
+            thumbnail: "https://i.ytimg.com/vi/77ZozI0rw7w/hqdefault.jpg",
+            artist: "Meditation Channel",
+            description:
+              "The best collection of relaxing ambient music for meditation, sleep, and stress relief.",
+            service: "youtube",
+          },
+          {
+            id: "PLQkQfzsIUwRahdMm_C4Go0z5cHZtO5M2h",
+            title: "Peaceful Music Mix - Nature Sounds Playlist",
+            thumbnail: "https://i.ytimg.com/vi/hlWiI4xVXKY/hqdefault.jpg",
+            artist: "Nature Sounds",
+            description:
+              "A perfect mix of peaceful music with nature sounds for relaxation and meditation.",
+            service: "youtube",
+          },
+          {
+            id: "PLQkQfzsIUwRb2FG3gXGP7PQ8xqsS71h58",
+            title: "Meditation Music Playlist - Sleep & Relaxation Collection",
+            thumbnail: "https://i.ytimg.com/vi/DWcJFNfaw9c/hqdefault.jpg",
+            artist: "Deep Sleep Music",
+            description:
+              "Complete collection of meditation music to help you relax, sleep better and reduce anxiety.",
+            service: "youtube",
+          },
+        ];
+      } else {
+        return [
+          {
+            id: "PLOHoVaTp8R7dfrJW5TOb_P7X8xiGlfvDt",
+            title: "Lofi Hip Hop Mix - Best Study Music Playlist",
+            thumbnail: "https://i.ytimg.com/vi/jfKfPfyJRdk/hqdefault.jpg",
+            artist: "Lofi Girl",
+            description:
+              "The most popular lofi hip hop radio playlist - perfect beats to relax/study to.",
+            service: "youtube",
+          },
+          {
+            id: "PLOHoVaTp8R7cc1lqIi1FGy0t9qgsoHj9i",
+            title: "Focus Music Mix - Concentration & Productivity Playlist",
+            thumbnail: "https://i.ytimg.com/vi/5qap5aO4i9A/hqdefault.jpg",
+            artist: "Study Music",
+            description:
+              "The ultimate playlist for concentration, focus, and productivity for work and study.",
+            service: "youtube",
+          },
+          {
+            id: "PLOHoVaTp8R7dXJqeF0dFRUXDzBnHCzD0u",
+            title: "Study Music Playlist - Alpha Waves Collection",
+            thumbnail: "https://i.ytimg.com/vi/n61ULEU7CO0/hqdefault.jpg",
+            artist: "YellowBrickCinema",
+            description:
+              "A complete collection of alpha wave music for studying, memory enhancement, and focus.",
+            service: "youtube",
+          },
+        ];
+      }
     } else {
-      searchSpotify(searchQuery);
+      // Single video results
+      if (isRelaxQuery) {
+        return [
+          {
+            id: "DWcJFNfaw9c",
+            title: "Relaxing Piano Music for Stress Relief",
+            thumbnail: "https://i.ytimg.com/vi/DWcJFNfaw9c/hqdefault.jpg",
+            artist: "Meditation Music",
+            description:
+              "Beautiful piano music for stress relief, meditation, and relaxation.",
+            duration: 3600,
+            service: "youtube",
+          },
+          {
+            id: "77ZozI0rw7w",
+            title: "Relaxing Sleep Music with Rain Sounds",
+            thumbnail: "https://i.ytimg.com/vi/77ZozI0rw7w/hqdefault.jpg",
+            artist: "Sleep Music",
+            description:
+              "Deep sleeping music combined with gentle rain sounds for complete relaxation.",
+            duration: 28800,
+            service: "youtube",
+          },
+          {
+            id: "hlWiI4xVXKY",
+            title: "Relaxing Jazz Music and Rain Sounds",
+            thumbnail: "https://i.ytimg.com/vi/hlWiI4xVXKY/hqdefault.jpg",
+            artist: "Calm Music",
+            description:
+              "Soft jazz with the sound of gentle rain for the ultimate relaxation experience.",
+            duration: 10800,
+            service: "youtube",
+          },
+        ];
+      } else {
+        return [
+          {
+            id: "jfKfPfyJRdk",
+            title: "lofi hip hop radio - beats to study/relax to",
+            thumbnail: "https://i.ytimg.com/vi/jfKfPfyJRdk/hqdefault.jpg",
+            artist: "Lofi Girl",
+            description:
+              "The original lofi hip hop radio - the perfect study beats 24/7.",
+            duration: 3600,
+            service: "youtube",
+          },
+          {
+            id: "5qap5aO4i9A",
+            title: "lofi hip hop radio - beats to relax/study to",
+            thumbnail: "https://i.ytimg.com/vi/5qap5aO4i9A/hqdefault.jpg",
+            artist: "Lofi Girl",
+            description:
+              "Chill study beats 24/7, the perfect stream for studying and working.",
+            duration: 3600,
+            service: "youtube",
+          },
+          {
+            id: "n61ULEU7CO0",
+            title: "Study Music Alpha Waves: Relaxing Studying Music",
+            thumbnail: "https://i.ytimg.com/vi/n61ULEU7CO0/hqdefault.jpg",
+            artist: "YellowBrickCinema",
+            description:
+              "Enhance your concentration and memory with alpha wave studying music.",
+            duration: 10800,
+            service: "youtube",
+          },
+        ];
+      }
     }
   };
 
-  // Handle search input
-  const handleSearchInputChange = (e) => {
-    setSearchQuery(e.target.value);
+  // Mock data for Spotify results
+  const getMockSpotifyResults = (query, isPlaylist = false) => {
+    const isRelaxQuery =
+      isBreak ||
+      query.toLowerCase().includes("relax") ||
+      query.toLowerCase().includes("ambient") ||
+      query.toLowerCase().includes("calm");
+
+    if (isPlaylist) {
+      // Playlist results
+      if (isRelaxQuery) {
+        return [
+          {
+            id: "37i9dQZF1DWZqd5JICZI0u",
+            name: "Peaceful Piano",
+            image:
+              "https://i.scdn.co/image/ab67706f00000002ca5a7517156021292e5663a4",
+            owner: "Spotify",
+            trackCount: 178,
+            description: "Relax and indulge with beautiful piano pieces",
+            service: "spotify",
+          },
+          {
+            id: "37i9dQZF1DWYcDQ1hSjOpY",
+            name: "Deep Sleep",
+            image:
+              "https://i.scdn.co/image/ab67706f000000025249a34bd5c54d12ae7a8613",
+            owner: "Spotify",
+            trackCount: 150,
+            description: "Soothing sounds to help you fall asleep",
+            service: "spotify",
+          },
+          {
+            id: "37i9dQZF1DX4J9bG4Jp0RH",
+            name: "Relaxing Jazz",
+            image:
+              "https://i.scdn.co/image/ab67706f0000000278b4745cb9ce8ffe32daaf7e",
+            owner: "Spotify",
+            trackCount: 125,
+            description: "Smooth jazz to relax to",
+            service: "spotify",
+          },
+        ];
+      } else {
+        return [
+          {
+            id: "37i9dQZF1DWZeKCadgRdKQ",
+            name: "Focus Flow",
+            image:
+              "https://i.scdn.co/image/ab67706f000000022d4195adee3c41dabd718435",
+            owner: "Spotify",
+            trackCount: 166,
+            description: "Uptempo instrumental hip hop beats",
+            service: "spotify",
+          },
+          {
+            id: "37i9dQZF1DWXLeA8Omikj7",
+            name: "Brain Food",
+            image:
+              "https://i.scdn.co/image/ab67706f000000026e849349fc0a57e606644442",
+            owner: "Spotify",
+            trackCount: 125,
+            description: "Hypnotic electronic for studies and work",
+            service: "spotify",
+          },
+          {
+            id: "37i9dQZF1DX8NTLI2TtZa6",
+            name: "Instrumental Study",
+            image:
+              "https://i.scdn.co/image/ab67706f00000002fe24d7084be472288cd6ee6c",
+            owner: "Spotify",
+            trackCount: 193,
+            description: "Focus with soft study music in the background",
+            service: "spotify",
+          },
+        ];
+      }
+    } else {
+      // Track results
+      if (isRelaxQuery) {
+        return [
+          {
+            id: "3lPr8ghNDBLc2uZovNyLs9",
+            title: "Weightless",
+            artist: "Marconi Union",
+            albumName: "Weightless",
+            albumImage:
+              "https://i.scdn.co/image/ab67616d0000b273e9c65c678d997e060907d28c",
+            duration: 480,
+            service: "spotify",
+          },
+          {
+            id: "2uFaJJtFnADyYhRHG4bjGX",
+            title: "Gymnopedie No. 1",
+            artist: "Erik Satie",
+            albumName: "Classical Piano Pieces",
+            albumImage:
+              "https://i.scdn.co/image/ab67616d0000b273bd02d0fd27a8c3db71c3d933",
+            duration: 180,
+            service: "spotify",
+          },
+          {
+            id: "3V8GA9X4Bn9m4QU9lKSMtp",
+            title: "Autumn Leaves",
+            artist: "Bill Evans",
+            albumName: "Portrait in Jazz",
+            albumImage:
+              "https://i.scdn.co/image/ab67616d0000b273cca5d4486b0da58a30d0f4c4",
+            duration: 360,
+            service: "spotify",
+          },
+        ];
+      } else {
+        return [
+          {
+            id: "5sdQOyqq2IDhvmx2lHOpwd",
+            title: "The Girl I Haven't Met",
+            artist: "kudasai",
+            albumName: "Lofi Hip Hop Beats",
+            albumImage:
+              "https://i.scdn.co/image/ab67616d0000b273de3c04b5fc69c9721e7f1152",
+            duration: 132,
+            service: "spotify",
+          },
+          {
+            id: "0bMoNdAnxNR6p4RhO2EV7V",
+            title: "Midnight City Vibes",
+            artist: "Chillhop Music",
+            albumName: "Study Session",
+            albumImage:
+              "https://i.scdn.co/image/ab67616d0000b273a91c10fe9472d9bd89802e5a",
+            duration: 185,
+            service: "spotify",
+          },
+          {
+            id: "7fPuv9yRDayQvUmAz0CwCU",
+            title: "Coffee Shop Calm",
+            artist: "Lo-Fi Beats",
+            albumName: "Focus & Concentration",
+            albumImage:
+              "https://i.scdn.co/image/ab67616d0000b273b2871316e5040f8c406a46f2",
+            duration: 226,
+            service: "spotify",
+          },
+        ];
+      }
+    }
   };
 
-  // Handle search input key press
-  const handleSearchKeyPress = (e) => {
-    if (e.key === "Enter") {
-      handleSearch();
+  // Generate mock recommendations for top picks
+  const getMockRecommendations = () => {
+    if (service === "youtube") {
+      return getMockYoutubeResults(
+        isBreak ? "relaxation" : "focus",
+        Math.random() > 0.5
+      );
+    } else {
+      return getMockSpotifyResults(
+        isBreak ? "relaxation" : "focus",
+        Math.random() > 0.5
+      );
     }
   };
 
@@ -737,6 +1274,14 @@ const MusicPlayer = ({ isBreak }) => {
     // Reset progress
     setProgress(0);
     setCurrentTime(0);
+
+    // If it's a YouTube video, save it to recently played
+    if (service === "youtube") {
+      YouTubeService.saveToRecentlyPlayed(track);
+
+      // Update recently played list
+      setRecentlyPlayed(YouTubeService.getRecentlyPlayed().slice(0, 5));
+    }
   };
 
   // Format time
@@ -829,128 +1374,57 @@ const MusicPlayer = ({ isBreak }) => {
     }, 1500);
   };
 
-  // Mock data for YouTube results
-  const getMockYouTubeResults = (query) => {
-    const isRelaxQuery =
-      isBreak ||
-      query.toLowerCase().includes("relax") ||
-      query.toLowerCase().includes("ambient") ||
-      query.toLowerCase().includes("calm");
+  // Handle search
+  const handleSearch = () => {
+    if (searchQuery.trim() === "") {
+      setErrorMessage("Please enter a search term");
+      return;
+    }
 
-    if (isRelaxQuery) {
-      return [
-        {
-          id: "DWcJFNfaw9c",
-          title: "Relaxing Piano Music for Stress Relief",
-          thumbnail: "https://i.ytimg.com/vi/DWcJFNfaw9c/hqdefault.jpg",
-          artist: "Meditation Music",
-          service: "youtube",
-        },
-        {
-          id: "77ZozI0rw7w",
-          title: "Relaxing Sleep Music with Rain Sounds",
-          thumbnail: "https://i.ytimg.com/vi/77ZozI0rw7w/hqdefault.jpg",
-          artist: "Sleep Music",
-          service: "youtube",
-        },
-        {
-          id: "hlWiI4xVXKY",
-          title: "Relaxing Jazz Music and Rain Sounds",
-          thumbnail: "https://i.ytimg.com/vi/hlWiI4xVXKY/hqdefault.jpg",
-          artist: "Calm Music",
-          service: "youtube",
-        },
-      ];
+    if (service === "youtube") {
+      searchYouTube(searchQuery);
     } else {
-      return [
-        {
-          id: "jfKfPfyJRdk",
-          title: "lofi hip hop radio - beats to study/relax to",
-          thumbnail: "https://i.ytimg.com/vi/jfKfPfyJRdk/hqdefault.jpg",
-          artist: "Lofi Girl",
-          service: "youtube",
-        },
-        {
-          id: "5qap5aO4i9A",
-          title: "lofi hip hop radio - beats to relax/study to",
-          thumbnail: "https://i.ytimg.com/vi/5qap5aO4i9A/hqdefault.jpg",
-          artist: "Lofi Girl",
-          service: "youtube",
-        },
-        {
-          id: "n61ULEU7CO0",
-          title: "Study Music Alpha Waves: Relaxing Studying Music",
-          thumbnail: "https://i.ytimg.com/vi/n61ULEU7CO0/hqdefault.jpg",
-          artist: "YellowBrickCinema",
-          service: "youtube",
-        },
-      ];
+      searchSpotify(searchQuery);
     }
   };
 
-  // Mock data for Spotify results
-  const getMockSpotifyResults = (query) => {
-    const isRelaxQuery =
-      isBreak ||
-      query.toLowerCase().includes("relax") ||
-      query.toLowerCase().includes("ambient") ||
-      query.toLowerCase().includes("calm");
+  // Handle search input
+  const handleSearchInputChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
 
-    if (isRelaxQuery) {
-      return [
-        {
-          id: "1",
-          title: "Peaceful Piano",
-          thumbnail:
-            "https://i.scdn.co/image/ab67706f00000002ca5a7517156021292e5663a4",
-          artist: "Spotify",
-          service: "spotify",
-        },
-        {
-          id: "2",
-          title: "Deep Sleep",
-          thumbnail:
-            "https://i.scdn.co/image/ab67706f000000025249a34bd5c54d12ae7a8613",
-          artist: "Spotify",
-          service: "spotify",
-        },
-        {
-          id: "3",
-          title: "Relaxing Jazz",
-          thumbnail:
-            "https://i.scdn.co/image/ab67706f0000000278b4745cb9ce8ffe32daaf7e",
-          artist: "Spotify",
-          service: "spotify",
-        },
-      ];
-    } else {
-      return [
-        {
-          id: "4",
-          title: "Focus Flow",
-          thumbnail:
-            "https://i.scdn.co/image/ab67706f000000022d4195adee3c41dabd718435",
-          artist: "Spotify",
-          service: "spotify",
-        },
-        {
-          id: "5",
-          title: "Brain Food",
-          thumbnail:
-            "https://i.scdn.co/image/ab67706f000000026e849349fc0a57e606644442",
-          artist: "Spotify",
-          service: "spotify",
-        },
-        {
-          id: "6",
-          title: "Instrumental Study",
-          thumbnail:
-            "https://i.scdn.co/image/ab67706f00000002fe24d7084be472288cd6ee6c",
-          artist: "Spotify",
-          service: "spotify",
-        },
-      ];
+  // Handle search input key press
+  const handleSearchKeyPress = (e) => {
+    if (e.key === "Enter") {
+      handleSearch();
     }
+  };
+
+  // Handle content type change
+  const handleContentTypeChange = (type) => {
+    setContentType(type);
+    setSearchResults([]);
+    setErrorMessage("");
+  };
+
+  // Handle seeking in progress bar
+  const handleSeek = (e) => {
+    if (!currentTrack) return;
+
+    const progressBar = e.currentTarget;
+    const bounds = progressBar.getBoundingClientRect();
+    const x = e.clientX - bounds.left;
+    const width = bounds.width;
+    const percentage = (x / width) * 100;
+
+    // Calculate new time based on percentage
+    const totalDuration = currentTrack.duration || 272;
+    const newTime = Math.floor((percentage / 100) * totalDuration);
+
+    setCurrentTime(newTime);
+    setProgress(percentage);
+
+    // In a real implementation, we would seek the actual media player
   };
 
   // Render equalizer bars
@@ -968,6 +1442,17 @@ const MusicPlayer = ({ isBreak }) => {
         ))}
       </EqualizerBars>
     );
+  };
+
+  // Generate placeholder title for suggested search
+  const getSuggestedSearch = () => {
+    if (isBreak) {
+      return service === "youtube"
+        ? "relaxing music meditation"
+        : "meditation playlist";
+    } else {
+      return service === "youtube" ? "lofi study beats" : "focus playlist";
+    }
   };
 
   return (
@@ -1000,10 +1485,31 @@ const MusicPlayer = ({ isBreak }) => {
         </ServiceTab>
       </ServiceTabs>
 
+      <ContentTypeToggle>
+        <ContentTypeButton
+          $active={contentType === "tracks"}
+          onClick={() => handleContentTypeChange("tracks")}
+        >
+          {service === "youtube" ? "Videos" : "Tracks"}
+        </ContentTypeButton>
+        <ContentTypeButton
+          $active={contentType === "playlists"}
+          onClick={() => handleContentTypeChange("playlists")}
+        >
+          Playlists
+        </ContentTypeButton>
+      </ContentTypeToggle>
+
       <SearchContainer>
         <SearchInput
           type="text"
-          placeholder={`Cari ${service === "youtube" ? "video" : "lagu"}...`}
+          placeholder={`Cari ${
+            contentType === "tracks"
+              ? service === "youtube"
+                ? "video"
+                : "lagu"
+              : "playlist"
+          }... coba "${getSuggestedSearch()}"`}
           value={searchQuery}
           onChange={handleSearchInputChange}
           onKeyPress={handleSearchKeyPress}
@@ -1013,37 +1519,128 @@ const MusicPlayer = ({ isBreak }) => {
         </SearchButton>
       </SearchContainer>
 
+      <ErrorMessage $visible={errorMessage !== ""}>{errorMessage}</ErrorMessage>
+
+      <SearchLoadingSpinner $isLoading={isSearching} />
+
       {searchResults.length > 0 && (
         <ResultsList>
           {searchResults.map((result) => (
             <ResultItem key={result.id} onClick={() => playTrack(result)}>
-              <ResultThumbnail src={result.thumbnail} alt={result.title} />
+              <ResultThumbnail
+                src={
+                  service === "youtube"
+                    ? result.thumbnail
+                    : (contentType === "tracks"
+                        ? result.albumImage
+                        : result.image) || "/logo192.png"
+                }
+                alt={result.title || result.name}
+              />
               <ResultInfo>
-                <ResultTitle>{result.title}</ResultTitle>
-                <ResultArtist>{result.artist}</ResultArtist>
+                <ResultTitle>
+                  {contentType === "playlists" && service === "spotify" && (
+                    <SearchTypeTag>Playlist</SearchTypeTag>
+                  )}
+                  {result.title || result.name}
+                </ResultTitle>
+                <ResultArtist>
+                  {service === "youtube"
+                    ? result.artist
+                    : contentType === "tracks"
+                    ? result.artist
+                    : `${result.trackCount} tracks • ${result.owner}`}
+                </ResultArtist>
               </ResultInfo>
             </ResultItem>
           ))}
         </ResultsList>
       )}
 
+      {searchResults.length === 0 && !isSearching && !errorMessage && (
+        <>
+          {recentlyPlayed.length > 0 && service === "youtube" && (
+            <RecentlyPlayedSection>
+              <SectionTitle>
+                <i className="material-icons">history</i>
+                Recently Played
+              </SectionTitle>
+              <ResultsList>
+                {recentlyPlayed.map((item) => (
+                  <ResultItem key={item.id} onClick={() => playTrack(item)}>
+                    <ResultThumbnail src={item.thumbnail} alt={item.title} />
+                    <ResultInfo>
+                      <ResultTitle>{item.title}</ResultTitle>
+                      <ResultArtist>{item.artist}</ResultArtist>
+                    </ResultInfo>
+                  </ResultItem>
+                ))}
+              </ResultsList>
+            </RecentlyPlayedSection>
+          )}
+
+          <TopPicksContainer $visible={topPicks.length > 0}>
+            <SectionTitle>
+              <i className="material-icons">stars</i>
+              {isBreak ? "Recommended for Relaxation" : "Recommended for Focus"}
+            </SectionTitle>
+            <ResultsList>
+              {topPicks.map((item) => (
+                <ResultItem key={item.id} onClick={() => playTrack(item)}>
+                  <ResultThumbnail
+                    src={
+                      service === "youtube"
+                        ? item.thumbnail
+                        : item.image || item.albumImage || "/logo192.png"
+                    }
+                    alt={item.title || item.name}
+                  />
+                  <ResultInfo>
+                    <ResultTitle>{item.title || item.name}</ResultTitle>
+                    <ResultArtist>
+                      {service === "youtube"
+                        ? item.artist
+                        : item.artist ||
+                          `${item.trackCount || 0} tracks • ${
+                            item.owner || "Spotify"
+                          }`}
+                    </ResultArtist>
+                  </ResultInfo>
+                </ResultItem>
+              ))}
+            </ResultsList>
+          </TopPicksContainer>
+        </>
+      )}
+
       {currentTrack && (
         <>
           <TrackInfo>
             <TrackThumbnail
-              src={currentTrack.thumbnail}
-              alt={currentTrack.title}
+              src={
+                service === "youtube"
+                  ? currentTrack.thumbnail
+                  : (contentType === "tracks"
+                      ? currentTrack.albumImage
+                      : currentTrack.image) || "/logo192.png"
+              }
+              alt={currentTrack.title || currentTrack.name}
             />
             <TrackDetails>
-              <TrackTitle>{currentTrack.title}</TrackTitle>
-              <TrackArtist>{currentTrack.artist}</TrackArtist>
+              <TrackTitle>{currentTrack.title || currentTrack.name}</TrackTitle>
+              <TrackArtist>
+                {service === "youtube"
+                  ? currentTrack.artist
+                  : contentType === "tracks"
+                  ? currentTrack.artist
+                  : `${currentTrack.trackCount} tracks • ${currentTrack.owner}`}
+              </TrackArtist>
               <NowPlayingBadge>
                 <i className="material-icons" style={{ fontSize: "0.8rem" }}>
-                  {currentTrack.service === "youtube"
-                    ? "videocam"
-                    : "audiotrack"}
+                  {service === "youtube" ? "videocam" : "audiotrack"}
                 </i>
-                {currentTrack.service === "youtube" ? "YouTube" : "Spotify"}
+                {service === "youtube" ? "YouTube" : "Spotify"}
+                {contentType === "playlists" && " Playlist"}
               </NowPlayingBadge>
             </TrackDetails>
           </TrackInfo>
@@ -1062,17 +1659,17 @@ const MusicPlayer = ({ isBreak }) => {
             </ControlButton>
           </MusicControls>
 
-          <ProgressBar>
+          <ProgressBar onClick={handleSeek}>
             <Progress $percentage={progress} />
           </ProgressBar>
           <TimeDisplay>
             <span>{formatTime(currentTime)}</span>
-            <span>4:32</span>
+            <span>{formatTime(currentTrack.duration || 272)}</span>
           </TimeDisplay>
 
           <PlayerViewContainer $visible={showPlayer}>
             <IframeContainer>
-              {currentTrack && currentTrack.service === "youtube" && (
+              {service === "youtube" && (
                 <iframe
                   width="100%"
                   height="100%"
@@ -1083,9 +1680,11 @@ const MusicPlayer = ({ isBreak }) => {
                   allowFullScreen
                 ></iframe>
               )}
-              {currentTrack && currentTrack.service === "spotify" && (
+              {service === "spotify" && (
                 <iframe
-                  src={`https://open.spotify.com/embed/track/${currentTrack.id}`}
+                  src={`https://open.spotify.com/embed/${
+                    contentType === "tracks" ? "track" : "playlist"
+                  }/${currentTrack.id}`}
                   width="100%"
                   height="100%"
                   frameBorder="0"
@@ -1113,6 +1712,7 @@ const MusicPlayer = ({ isBreak }) => {
           </VolumeIcon>
         </VolumeIconButton>
         <VolumeWrapper>
+          <VolumeBadge $show={showVolumeBadge}>{volume}%</VolumeBadge>
           <VolumeSlider
             type="range"
             min="0"
@@ -1121,6 +1721,7 @@ const MusicPlayer = ({ isBreak }) => {
             onChange={handleVolumeChange}
             $percentage={volume}
           />
+          <VolumeValue>{volume}%</VolumeValue>
         </VolumeWrapper>
       </VolumeControl>
     </MusicPlayerContainer>
